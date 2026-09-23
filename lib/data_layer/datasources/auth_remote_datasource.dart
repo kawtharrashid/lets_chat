@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 class AuthRemoteDatasource {
   final FirebaseAuth firebaseAuth;
 
-  AuthRemoteDatasource(this.firebaseAuth);
+  AuthRemoteDatasource({required this.firebaseAuth});
 
   User? get currentUser => firebaseAuth.currentUser;
 

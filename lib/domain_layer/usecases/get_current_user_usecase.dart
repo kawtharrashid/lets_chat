@@ -1,12 +1,15 @@
-import '../entities/user_entity.dart';
+import 'package:lets_chat/core/usecase/usecase.dart';
+import 'package:lets_chat/core/utils/typedef.dart';
 import '../repositories/auth_repository.dart';
 
-class GetCurrentUserUseCase {
+class GetCurrentUserUseCase
+    implements NoParamsUseCase<NullableFutureUserEntity> {
   final AuthRepository repository;
 
   GetCurrentUserUseCase({required this.repository});
 
-  Future<UserEntity?> call() {
+  @override
+  NullableFutureUserEntity call() {
     return repository.getCurrentUser();
   }
 }

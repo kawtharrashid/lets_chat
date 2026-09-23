@@ -9,6 +9,7 @@ class MessageList extends StatelessWidget {
   final String userId;
   final ScrollController controller;
   final bool isLoadingMore;
+  final ValueChanged<String>? onRetry;
 
   const MessageList({
     Key? key,
@@ -16,6 +17,7 @@ class MessageList extends StatelessWidget {
     required this.userId,
     required this.controller,
     this.isLoadingMore = false,
+    this.onRetry,
   }) : super(key: key);
 
   @override
@@ -53,10 +55,11 @@ class MessageList extends StatelessWidget {
           key: ValueKey(
             message.clientId ?? message.id ?? '${message.senderId}_$index',
           ),
-          messageText: message.text,
+          message: message,
           isSender: message.senderId == userId,
-          isPending: message.isPending,
-          isFailed: message.isFailed,
+          onRetry: message.clientId == null || onRetry == null
+              ? null
+              : () => onRetry!(message.clientId!),
         );
       },
     );

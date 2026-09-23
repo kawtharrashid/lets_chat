@@ -2,14 +2,13 @@ import 'package:equatable/equatable.dart';
 
 class MessageEntity extends Equatable {
   final String? id;
-  final String text;
+  final String message;
   final String senderId;
   final DateTime? createdAt;
 
-  /// Local-only identifier used purely for optimistic UI.
-  /// Firestore never sees this field — it only exists so the UI can track
-  /// (and later remove/replace) a message that was added to the screen
-  /// before the server confirmed it.
+  /// Stable identifier for reconciling an optimistic message with Firestore.
+  /// The datasource uses this as the Firestore document ID, making retries
+  /// idempotent instead of creating duplicate documents.
   final String? clientId;
 
   /// True while a message we added optimistically is still being written
@@ -23,7 +22,7 @@ class MessageEntity extends Equatable {
 
   const MessageEntity({
     this.id,
-    required this.text,
+    required this.message,
     required this.senderId,
     this.createdAt,
     this.clientId,
@@ -33,7 +32,7 @@ class MessageEntity extends Equatable {
 
   MessageEntity copyWith({
     String? id,
-    String? text,
+    String? message,
     String? senderId,
     DateTime? createdAt,
     String? clientId,
@@ -42,7 +41,7 @@ class MessageEntity extends Equatable {
   }) {
     return MessageEntity(
       id: id ?? this.id,
-      text: text ?? this.text,
+      message: message ?? this.message,
       senderId: senderId ?? this.senderId,
       createdAt: createdAt ?? this.createdAt,
       clientId: clientId ?? this.clientId,
@@ -53,5 +52,5 @@ class MessageEntity extends Equatable {
 
   @override
   List<Object?> get props =>
-      [id, text, senderId, createdAt, clientId, isPending, isFailed];
+      [id, message, senderId, createdAt, clientId, isPending, isFailed];
 }

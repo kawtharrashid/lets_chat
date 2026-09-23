@@ -13,7 +13,7 @@ void main() {
   setUpAll(() {
     // Needed so mocktail can match `any()` for a custom argument type.
     registerFallbackValue(
-      const MessageEntity(text: '', senderId: ''),
+      const MessageEntity(message: '', senderId: ''),
     );
   });
 
@@ -22,7 +22,7 @@ void main() {
     useCase = SendMessageUseCase(repository: repository);
   });
 
-  const message = MessageEntity(text: 'Hello!', senderId: 'uid_1');
+  const message = MessageEntity(message: 'Hello!', senderId: 'uid_1');
 
   test('delegates the exact message to repository.sendMessage', () async {
     when(() => repository.sendMessage(any())).thenAnswer((_) async {});

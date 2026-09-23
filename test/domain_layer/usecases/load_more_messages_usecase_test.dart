@@ -1,18 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lets_chat/domain_layer/entities/message_entity.dart';
 import 'package:lets_chat/domain_layer/repositories/chat_repository.dart';
-import 'package:lets_chat/domain_layer/usecases/get_more_messages_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/load_messages_usecase.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockChatRepository extends Mock implements ChatRepository {}
 
 void main() {
   late MockChatRepository repository;
-  late GetMoreMessagesUseCase useCase;
+  late LoadMoreMessagesUseCase useCase;
 
   setUp(() {
     repository = MockChatRepository();
-    useCase = GetMoreMessagesUseCase(repository: repository);
+    useCase = LoadMoreMessagesUseCase(repository: repository);
   });
 
   final lastCreatedAt = DateTime(2026, 1, 1);
@@ -20,7 +20,7 @@ void main() {
   final olderMessages = [
     MessageEntity(
       id: 'm0',
-      text: 'Older message',
+      message: 'Older message',
       senderId: 'uid_1',
       createdAt: DateTime(2025, 12, 31),
     ),
@@ -32,7 +32,8 @@ void main() {
           limit: 30,
         )).thenAnswer((_) async => olderMessages);
 
-    final result = await useCase(lastCreatedAt: lastCreatedAt, limit: 30);
+    final result = await useCase(
+        LoadMoreMessagesParams(lastCreatedAt: lastCreatedAt, limit: 30));
 
     expect(result, olderMessages);
     verify(
@@ -49,7 +50,8 @@ void main() {
           limit: 30,
         )).thenAnswer((_) async => []);
 
-    final result = await useCase(lastCreatedAt: lastCreatedAt, limit: 30);
+    final result = await useCase(
+        LoadMoreMessagesParams(lastCreatedAt: lastCreatedAt, limit: 30));
 
     expect(result, isEmpty);
   });

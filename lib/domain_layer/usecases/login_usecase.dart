@@ -1,18 +1,15 @@
-import '../entities/user_entity.dart';
+import 'package:lets_chat/core/usecase/usecase.dart';
+import 'package:lets_chat/core/utils/typedef.dart';
+import 'package:lets_chat/domain_layer/usecases/params/auth_params.dart';
 import '../repositories/auth_repository.dart';
 
-class LoginUseCase {
+class LoginUseCase implements UseCase<FutureUserEntity, AuthParams> {
   final AuthRepository repository;
 
-  LoginUseCase(this.repository);
+  LoginUseCase({required this.repository});
 
-  Future<UserEntity> call({
-    required String email,
-    required String password,
-  }) {
-    return repository.login(
-      email: email,
-      password: password,
-    );
+  @override
+  FutureUserEntity call(AuthParams input) {
+    return repository.login(email: input.email, password: input.password);
   }
 }

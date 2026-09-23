@@ -1,46 +1,46 @@
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lets_chat/domain_layer/entities/message_entity.dart';
-import 'package:lets_chat/domain_layer/usecases/get_messages_usecase.dart';
-import 'package:lets_chat/domain_layer/usecases/get_more_messages_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/watch_messages_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/load_messages_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/send_message_usecase.dart';
 import 'package:lets_chat/presentation_layer/cubits/chat_cubit/chat_cubit.dart';
 import 'package:lets_chat/presentation_layer/cubits/chat_cubit/chat_state.dart';
 import 'package:mocktail/mocktail.dart';
 
-class MockGetMessagesUseCase extends Mock implements GetMessagesUseCase {}
+class MockWatchMessagesUseCase extends Mock implements WatchMessagesUseCase {}
 
-class MockGetMoreMessagesUseCase extends Mock
-    implements GetMoreMessagesUseCase {}
+class MockLoadMoreMessagesUseCase extends Mock
+    implements LoadMoreMessagesUseCase {}
 
 class MockSendMessageUseCase extends Mock implements SendMessageUseCase {}
 
 void main() {
-  late MockGetMessagesUseCase getMessagesUseCase;
-  late MockGetMoreMessagesUseCase getMoreMessagesUseCase;
+  late MockWatchMessagesUseCase watchMessagesUseCase;
+  late MockLoadMoreMessagesUseCase loadMoreMessagesUseCase;
   late MockSendMessageUseCase sendMessageUseCase;
 
   setUpAll(() {
-    registerFallbackValue(const MessageEntity(text: '', senderId: ''));
+    registerFallbackValue(const MessageEntity(message: '', senderId: ''));
   });
 
   setUp(() {
-    getMessagesUseCase = MockGetMessagesUseCase();
-    getMoreMessagesUseCase = MockGetMoreMessagesUseCase();
+    watchMessagesUseCase = MockWatchMessagesUseCase();
+    loadMoreMessagesUseCase = MockLoadMoreMessagesUseCase();
     sendMessageUseCase = MockSendMessageUseCase();
   });
 
   ChatCubit buildCubit() {
     return ChatCubit(
-      getMessagesUseCase: getMessagesUseCase,
-      getMoreMessagesUseCase: getMoreMessagesUseCase,
+      watchMessagesUseCase: watchMessagesUseCase,
+      loadMoreMessagesUseCase: loadMoreMessagesUseCase,
       sendMessageUseCase: sendMessageUseCase,
     );
   }
 
   final firstMessage = MessageEntity(
     id: 'm1',
-    text: 'Hello!',
+    message: 'Hello!',
     senderId: 'uid_1',
     createdAt: DateTime(2026, 1, 2),
   );
@@ -49,7 +49,7 @@ void main() {
     blocTest<ChatCubit, ChatState>(
       'emits [loading, success(messages)] when the stream delivers data',
       build: () {
-        when(() => getMessagesUseCase(limit: 30))
+        when(() => watchMessagesUseCase(30))
             .thenAnswer((_) => Stream.value([firstMessage]));
         return buildCubit();
       },
@@ -67,7 +67,7 @@ void main() {
     blocTest<ChatCubit, ChatState>(
       'emits [loading, failure] when the stream errors out',
       build: () {
-        when(() => getMessagesUseCase(limit: 30)).thenAnswer(
+        when(() => watchMessagesUseCase(30)).thenAnswer(
           (_) => Stream.error(Exception('Firestore permission denied')),
         );
         return buildCubit();
@@ -102,10 +102,10 @@ void main() {
       act: (cubit) => cubit.loadMoreMessages(),
       expect: () => [],
       verify: (_) {
-        verifyNever(() => getMoreMessagesUseCase(
-              lastCreatedAt: any(named: 'lastCreatedAt'),
-              limit: any(named: 'limit'),
-            ));
+        verifyNever(() => loadMoreMessagesUseCase(LoadMoreMessagesParams(
+              lastCreatedAt: firstMessage.createdAt!,
+              limit: 30,
+            )));
       },
     );
 
@@ -123,13 +123,13 @@ void main() {
     blocTest<ChatCubit, ChatState>(
       'appends older messages and flags hasReachedEnd on a short page',
       build: () {
-        when(() => getMoreMessagesUseCase(
+        when(() => loadMoreMessagesUseCase(LoadMoreMessagesParams(
               lastCreatedAt: firstMessage.createdAt!,
               limit: 30,
-            )).thenAnswer((_) async => [
+            ))).thenAnswer((_) async => [
               MessageEntity(
                 id: 'm0',
-                text: 'Older message',
+                message: 'Older message',
                 senderId: 'uid_1',
                 createdAt: DateTime(2026, 1, 1),
               ),
@@ -156,14 +156,14 @@ void main() {
         when(() => sendMessageUseCase(any())).thenAnswer((_) async {});
         return buildCubit();
       },
-      act: (cubit) => cubit.sendMessage(text: 'Hi there', userId: 'uid_1'),
+      act: (cubit) => cubit.sendMessage(message: 'Hi there', userId: 'uid_1'),
       expect: () => [
         isA<ChatState>()
             .having((s) => s.sendMessageStatus, 'sendMessageStatus',
                 SendMessageStatus.sending)
             .having((s) => s.messages.length, 'messages.length', 1)
             .having((s) => s.messages.first.isPending, 'isPending', true)
-            .having((s) => s.messages.first.text, 'text', 'Hi there'),
+            .having((s) => s.messages.first.message, 'message', 'Hi there'),
         isA<ChatState>()
             .having((s) => s.sendMessageStatus, 'sendMessageStatus',
                 SendMessageStatus.idle)
@@ -182,7 +182,7 @@ void main() {
             .thenThrow(Exception('No internet connection.'));
         return buildCubit();
       },
-      act: (cubit) => cubit.sendMessage(text: 'Hi there', userId: 'uid_1'),
+      act: (cubit) => cubit.sendMessage(message: 'Hi there', userId: 'uid_1'),
       expect: () => [
         isA<ChatState>()
             .having((s) => s.sendMessageStatus, 'sendMessageStatus',
@@ -198,9 +198,9 @@ void main() {
     );
 
     blocTest<ChatCubit, ChatState>(
-      'ignores blank/whitespace-only text and never calls the use case',
+      'ignores blank/whitespace-only message and never calls the use case',
       build: buildCubit,
-      act: (cubit) => cubit.sendMessage(text: '   ', userId: 'uid_1'),
+      act: (cubit) => cubit.sendMessage(message: '   ', userId: 'uid_1'),
       expect: () => [],
       verify: (_) {
         verifyNever(() => sendMessageUseCase(any()));

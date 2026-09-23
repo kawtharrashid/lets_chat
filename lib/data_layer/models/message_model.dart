@@ -4,66 +4,55 @@ import 'package:lets_chat/domain_layer/entities/message_entity.dart';
 
 class MessageModel {
   final String? id;
-  final String text;
+  final String? clientId;
+
+  final String message;
   final String senderId;
   final DateTime? createdAt;
 
   const MessageModel({
     this.id,
-    required this.text,
+    required this.message,
     required this.senderId,
     this.createdAt,
+    this.clientId,
   });
 
   factory MessageModel.fromEntity(
     MessageEntity entity,
   ) {
     return MessageModel(
-      id: entity.id,
-      text: entity.text,
-      senderId: entity.senderId,
-      createdAt: entity.createdAt,
-    );
+        id: entity.id,
+        message: entity.message,
+        senderId: entity.senderId,
+        createdAt: entity.createdAt,
+        clientId: entity.clientId);
   }
 
   factory MessageModel.fromFirestore(
     DocumentSnapshot<Map<String, dynamic>> doc,
   ) {
     final data = doc.data();
-
     if (data == null) {
-      throw const FormatException(
-        'Message document is empty.',
-      );
+      throw const FormatException('Message document is empty.');
     }
 
-    final text = data[kMessage];
+    final message = data[kMessage];
     final senderId = data[kSenderId];
+    if (message is! String || senderId is! String) {
+      throw const FormatException('Invalid message document.');
+    }
+
     final createdAtValue = data[kCreatedAt];
+    final DateTime? createdAt =
+        createdAtValue is Timestamp ? createdAtValue.toDate() : null;
 
-    if (text is! String || senderId is! String) {
-      throw const FormatException(
-        'Invalid message document.',
-      );
-    }
-
-    DateTime? createdAt;
-
-    if (createdAtValue is Timestamp) {
-      createdAt = createdAtValue.toDate();
-    } else if (createdAtValue is DateTime) {
-      createdAt = createdAtValue;
-    } else if (createdAtValue is String) {
-      createdAt = DateTime.tryParse(createdAtValue);
-    } else if (createdAtValue is int) {
-      createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtValue);
-    } else {
-      createdAt = DateTime.now();
-    }
-
+    // For new messages, the document ID is the stable client ID. Falling
+    // back to doc.id also supports documents created by older app versions.
     return MessageModel(
       id: doc.id,
-      text: text,
+      clientId: doc.id,
+      message: message,
       senderId: senderId,
       createdAt: createdAt,
     );
@@ -72,7 +61,8 @@ class MessageModel {
   MessageEntity toEntity() {
     return MessageEntity(
       id: id,
-      text: text,
+      clientId: clientId ?? id,
+      message: message,
       senderId: senderId,
       createdAt: createdAt,
     );
@@ -80,7 +70,7 @@ class MessageModel {
 
   Map<String, dynamic> toJson() {
     return {
-      kMessage: text,
+      kMessage: message,
       kSenderId: senderId,
       kCreatedAt: FieldValue.serverTimestamp(),
     };

@@ -1,24 +1,24 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lets_chat/domain_layer/entities/message_entity.dart';
 import 'package:lets_chat/domain_layer/repositories/chat_repository.dart';
-import 'package:lets_chat/domain_layer/usecases/get_messages_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/watch_messages_usecase.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockChatRepository extends Mock implements ChatRepository {}
 
 void main() {
   late MockChatRepository repository;
-  late GetMessagesUseCase useCase;
+  late WatchMessagesUseCase useCase;
 
   setUp(() {
     repository = MockChatRepository();
-    useCase = GetMessagesUseCase(repository: repository);
+    useCase = WatchMessagesUseCase(repository: repository);
   });
 
   final messages = [
     MessageEntity(
       id: 'm1',
-      text: 'Hi',
+      message: 'Hi',
       senderId: 'uid_1',
       createdAt: DateTime(2026, 1, 1),
     ),
@@ -28,7 +28,7 @@ void main() {
     when(() => repository.getMessages(limit: 30))
         .thenAnswer((_) => Stream.value(messages));
 
-    useCase(limit: 30);
+    useCase(30);
 
     verify(() => repository.getMessages(limit: 30)).called(1);
   });
@@ -37,7 +37,7 @@ void main() {
     when(() => repository.getMessages(limit: 30))
         .thenAnswer((_) => Stream.value(messages));
 
-    expect(useCase(limit: 30), emits(messages));
+    expect(useCase(30), emits(messages));
   });
 
   test('propagates stream errors', () {
@@ -46,7 +46,7 @@ void main() {
     );
 
     expect(
-      useCase(limit: 30),
+      useCase(30),
       emitsError(isA<Exception>()),
     );
   });

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lets_chat/core/constants.dart';
-import 'package:lets_chat/domain_layer/usecases/get_messages_usecase.dart';
-import 'package:lets_chat/domain_layer/usecases/get_more_messages_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/load_messages_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/send_message_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/watch_messages_usecase.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_cubit.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_state.dart';
 import 'package:lets_chat/presentation_layer/cubits/chat_cubit/chat_cubit.dart';
@@ -12,15 +12,15 @@ import 'package:lets_chat/presentation_layer/pages/login_page.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class AuthGate extends StatefulWidget {
-  final GetMessagesUseCase getMessagesUseCase;
+  final WatchMessagesUseCase watchMessagesUseCase;
   final SendMessageUseCase sendMessageUseCase;
-  final GetMoreMessagesUseCase getMoreMessagesUseCase;
+  final LoadMoreMessagesUseCase loadMoreMessagesUseCase;
 
   const AuthGate({
     Key? key,
-    required this.getMessagesUseCase,
+    required this.watchMessagesUseCase,
     required this.sendMessageUseCase,
-    required this.getMoreMessagesUseCase,
+    required this.loadMoreMessagesUseCase,
   }) : super(key: key);
 
   @override
@@ -85,9 +85,9 @@ class _AuthGateState extends State<AuthGate> {
 
               _currentPage = BlocProvider<ChatCubit>(
                 create: (_) => ChatCubit(
-                  getMessagesUseCase: widget.getMessagesUseCase,
+                  watchMessagesUseCase: widget.watchMessagesUseCase,
                   sendMessageUseCase: widget.sendMessageUseCase,
-                  getMoreMessagesUseCase: widget.getMoreMessagesUseCase,
+                  loadMoreMessagesUseCase: widget.loadMoreMessagesUseCase,
                 )..getMessages(),
                 child: ChatPage(user: user),
               );

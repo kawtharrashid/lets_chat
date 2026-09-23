@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:lets_chat/domain_layer/entities/user_entity.dart';
 import 'package:lets_chat/domain_layer/repositories/auth_repository.dart';
 import 'package:lets_chat/domain_layer/usecases/login_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/params/auth_params.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockAuthRepository extends Mock implements AuthRepository {}
@@ -16,14 +17,15 @@ void main() {
 
   setUp(() {
     repository = MockAuthRepository();
-    useCase = LoginUseCase(repository);
+    useCase = LoginUseCase(repository: repository);
   });
 
   test('returns the UserEntity when the repository call succeeds', () async {
     when(() => repository.login(email: email, password: password))
         .thenAnswer((_) async => user);
 
-    final result = await useCase(email: email, password: password);
+    final result =
+        await useCase(const AuthParams(email: email, password: password));
 
     expect(result, user);
     verify(
@@ -36,7 +38,7 @@ void main() {
         .thenThrow(Exception('Incorrect password.'));
 
     expect(
-      () => useCase(email: email, password: password),
+      () => useCase(const AuthParams(email: email, password: password)),
       throwsA(isA<Exception>()),
     );
   });
@@ -47,7 +49,8 @@ void main() {
           password: any(named: 'password'),
         )).thenAnswer((_) async => user);
 
-    await useCase(email: 'someone@else.com', password: 'hunter2');
+    await useCase(
+        const AuthParams(email: 'someone@else.com', password: 'hunter2'));
 
     verify(
       () => repository.login(

@@ -9,8 +9,8 @@ import 'package:lets_chat/data_layer/datasources/chat_remote_datasource.dart';
 import 'package:lets_chat/data_layer/repositories/auth_repository_impl.dart';
 import 'package:lets_chat/data_layer/repositories/chat_repository_impl.dart';
 import 'package:lets_chat/domain_layer/usecases/get_current_user_usecase.dart';
-import 'package:lets_chat/domain_layer/usecases/get_messages_usecase.dart';
-import 'package:lets_chat/domain_layer/usecases/get_more_messages_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/watch_messages_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/load_messages_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/login_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/logout_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/register_usecase.dart';
@@ -33,9 +33,9 @@ class LetsChat extends StatelessWidget {
   const LetsChat({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext conmessage) {
     final authDatasource = AuthRemoteDatasource(
-      FirebaseAuth.instance,
+      firebaseAuth: FirebaseAuth.instance,
     );
 
     final authRepository = AuthRepositoryImpl(
@@ -43,11 +43,11 @@ class LetsChat extends StatelessWidget {
     );
 
     final loginUseCase = LoginUseCase(
-      authRepository,
+      repository: authRepository,
     );
 
     final registerUseCase = RegisterUseCase(
-      authRepository,
+      repository: authRepository,
     );
 
     final getCurrentUserUseCase = GetCurrentUserUseCase(
@@ -65,11 +65,11 @@ class LetsChat extends StatelessWidget {
       chatDatasource,
     );
 
-    final getMessagesUseCase = GetMessagesUseCase(
+    final watchMessagesUseCase = WatchMessagesUseCase(
       repository: chatRepository,
     );
 
-    final getMoreMessagesUseCase = GetMoreMessagesUseCase(
+    final loadMoreMessagesUseCase = LoadMoreMessagesUseCase(
       repository: chatRepository,
     );
 
@@ -87,9 +87,9 @@ class LetsChat extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         home: AuthGate(
-          getMessagesUseCase: getMessagesUseCase,
+          watchMessagesUseCase: watchMessagesUseCase,
           sendMessageUseCase: sendMessageUseCase,
-          getMoreMessagesUseCase: getMoreMessagesUseCase,
+          loadMoreMessagesUseCase: loadMoreMessagesUseCase,
         ),
         routes: {
           LoginPage.id: (_) => const LoginPage(),

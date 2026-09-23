@@ -4,6 +4,7 @@ import 'package:lets_chat/domain_layer/entities/user_entity.dart';
 import 'package:lets_chat/domain_layer/usecases/get_current_user_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/login_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/logout_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/params/auth_params.dart';
 import 'package:lets_chat/domain_layer/usecases/register_usecase.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_cubit.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_state.dart';
@@ -89,7 +90,8 @@ void main() {
     blocTest<AuthCubit, AuthState>(
       'emits [loading, authenticated] on successful login',
       build: () {
-        when(() => loginUseCase(email: email, password: password))
+        when(() => loginUseCase(
+                const AuthParams(email: email, password: password)))
             .thenAnswer((_) async => user);
         return buildCubit();
       },
@@ -103,7 +105,8 @@ void main() {
     blocTest<AuthCubit, AuthState>(
       'emits [loading, failure] with a readable message when login throws',
       build: () {
-        when(() => loginUseCase(email: email, password: password))
+        when(() => loginUseCase(
+                const AuthParams(email: email, password: password)))
             .thenThrow(Exception('Incorrect password.'));
         return buildCubit();
       },
@@ -115,7 +118,8 @@ void main() {
     );
 
     test('returns the UserEntity to the caller on success', () async {
-      when(() => loginUseCase(email: email, password: password))
+      when(() =>
+              loginUseCase(const AuthParams(email: email, password: password)))
           .thenAnswer((_) async => user);
 
       final cubit = buildCubit();
@@ -131,7 +135,8 @@ void main() {
     blocTest<AuthCubit, AuthState>(
       'emits [loading, authenticated] on successful registration',
       build: () {
-        when(() => registerUseCase(email: email, password: password))
+        when(() => registerUseCase(
+                const AuthParams(email: email, password: password)))
             .thenAnswer((_) async => user);
         return buildCubit();
       },
@@ -145,7 +150,8 @@ void main() {
     blocTest<AuthCubit, AuthState>(
       'emits [loading, failure] when the email is already registered',
       build: () {
-        when(() => registerUseCase(email: email, password: password))
+        when(() => registerUseCase(
+                const AuthParams(email: email, password: password)))
             .thenThrow(Exception('An account already exists for that email.'));
         return buildCubit();
       },

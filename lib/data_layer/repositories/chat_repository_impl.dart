@@ -11,16 +11,7 @@ class ChatRepositoryImpl implements ChatRepository {
   @override
   Stream<List<MessageEntity>> getMessages({int limit = 30}) {
     return datasource.getMessages(limit: limit).map(
-          (messages) => messages
-              .map(
-                (message) => MessageEntity(
-                  id: message.id,
-                  text: message.text,
-                  senderId: message.senderId,
-                  createdAt: message.createdAt,
-                ),
-              )
-              .toList(),
+          (messages) => messages.map((message) => message.toEntity()).toList(),
         );
   }
 
@@ -33,24 +24,11 @@ class ChatRepositoryImpl implements ChatRepository {
       lastCreatedAt: lastCreatedAt,
       limit: limit,
     );
-
-    return more
-        .map((message) => MessageEntity(
-              id: message.id,
-              text: message.text,
-              senderId: message.senderId,
-              createdAt: message.createdAt,
-            ))
-        .toList();
+    return more.map((message) => message.toEntity()).toList();
   }
 
   @override
   Future<void> sendMessage(MessageEntity message) {
-    return datasource.sendMessage(MessageModel(
-      id: message.id ?? '',
-      text: message.text,
-      senderId: message.senderId,
-      createdAt: message.createdAt,
-    ));
+    return datasource.sendMessage(MessageModel.fromEntity(message));
   }
 }

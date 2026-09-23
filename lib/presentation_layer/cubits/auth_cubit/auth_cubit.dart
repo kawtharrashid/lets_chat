@@ -5,6 +5,7 @@ import 'package:lets_chat/domain_layer/entities/user_entity.dart';
 import 'package:lets_chat/domain_layer/usecases/get_current_user_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/login_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/logout_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/params/auth_params.dart';
 import 'package:lets_chat/domain_layer/usecases/register_usecase.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_state.dart';
 
@@ -57,10 +58,8 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthState.loading());
 
     try {
-      final user = await loginUseCase(
-        email: email,
-        password: password,
-      );
+      final user =
+          await loginUseCase(AuthParams(email: email, password: password));
 
       emit(AuthState.authenticated(user));
 
@@ -79,10 +78,8 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthState.loading());
 
     try {
-      final user = await registerUseCase(
-        email: email,
-        password: password,
-      );
+      final user =
+          await registerUseCase(AuthParams(email: email, password: password));
 
       emit(AuthState.authenticated(user));
 
