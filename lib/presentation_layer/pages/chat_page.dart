@@ -81,14 +81,17 @@ class _ChatPageState extends State<ChatPage> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Logout'),
+          title: const Text(
+            'Logout',
+            style: TextStyle(color: Colors.black),
+          ),
           content: const Text('Are you sure you want to logout?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
               child: const Text(
                 'Cancel',
-                style: TextStyle(color: Colors.black),
+                style: TextStyle(color: Colors.black87),
               ),
             ),
             TextButton(
@@ -99,6 +102,7 @@ class _ChatPageState extends State<ChatPage> {
               ),
             ),
           ],
+          surfaceTintColor: kPrimaryColor,
         );
       },
     );
@@ -152,7 +156,7 @@ class _ChatPageState extends State<ChatPage> {
                   if (state.messages.isEmpty) {
                     return const Center(
                       child: Text(
-                        'No messages yet.',
+                        'No messages here yet. Start chatting!',
                       ),
                     );
                   }
