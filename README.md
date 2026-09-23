@@ -97,5 +97,4 @@ Development notes
 Flutter Developer
 
 - GitHub: [github.com/kawtharrashid](https://github.com/kawtharrashid)
-- LinkedIn: [linkedin.com/in/kawthar-rashid-811418437/]
-(https://www.linkedin.com/in/kawthar-rashid-811418437/)
+- LinkedIn: [linkedin.com/in/kawthar-rashid-811418437/](https://www.linkedin.com/in/kawthar-rashid-811418437/)
