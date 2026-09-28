@@ -4,6 +4,13 @@
 
 Lets Chat is a lightweight, Flutter-based real-time chat application built with a clean, layered architecture. It demonstrates a practical organization for production-ready apps using use-cases, repositories, and BLoC/Cubit state management. The project integrates with Firebase for authentication and Firestore for message persistence.
 
+<p align="center">
+  <img src="screenshots/login.png" width="200"/>
+  <img src="screenshots/register.png" width="200"/>
+  <img src="screenshots/message-states.png" width="200"/>
+  <img src="screenshots/logout.png" width="200"/>
+</p>
+
 Key goals
 - Clear separation between presentation, domain, and data layers
 - Predictable authentication flow (AuthCubit + AuthGate)
