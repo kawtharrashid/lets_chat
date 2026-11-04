@@ -1,14 +1,14 @@
-import '../entities/user_entity.dart';
+import 'package:lets_chat/core/utils/typedef.dart';
 
 abstract class AuthRepository {
-  Future<UserEntity?> getCurrentUser();
+  NullableFutureUserEntity getCurrentUser();
 
-  Future<UserEntity> login({
+  FutureUserEntity login({
     required String email,
     required String password,
   });
 
-  Future<UserEntity> register({
+  FutureUserEntity register({
     required String email,
     required String password,
   });

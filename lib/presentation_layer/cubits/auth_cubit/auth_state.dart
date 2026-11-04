@@ -12,35 +12,35 @@ enum AuthStatus {
 class AuthState extends Equatable {
   final AuthStatus status;
   final UserEntity? user;
-  final String? errorMessage;
+  final String? errorCode;
 
   const AuthState({
     required this.status,
     this.user,
-    this.errorMessage,
+    this.errorCode,
   });
 
   const AuthState.initial()
       : status = AuthStatus.initial,
         user = null,
-        errorMessage = null;
+        errorCode = null;
 
   const AuthState.loading({this.user})
       : status = AuthStatus.loading,
-        errorMessage = null;
+        errorCode = null;
 
   const AuthState.authenticated(
     this.user,
   )   : status = AuthStatus.authenticated,
-        errorMessage = null;
+        errorCode = null;
 
-  const AuthState.unauthenticated({this.errorMessage})
+  const AuthState.unauthenticated({this.errorCode})
       : status = AuthStatus.unauthenticated,
         user = null;
 
-  const AuthState.failure(this.errorMessage)
+  const AuthState.failure(this.errorCode)
       : status = AuthStatus.failure,
         user = null;
   @override
-  List<Object?> get props => [status, user, errorMessage];
+  List<Object?> get props => [status, user, errorCode];
 }

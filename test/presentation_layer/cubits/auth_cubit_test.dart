@@ -81,7 +81,7 @@ void main() {
       act: (cubit) => cubit.initialize(),
       expect: () => [
         const AuthState.loading(),
-        const AuthState.failure('Could not reach Firebase.'),
+        const AuthState.failure('unknown_error'),
       ],
     );
   });
@@ -113,7 +113,7 @@ void main() {
       act: (cubit) => cubit.login(email: email, password: password),
       expect: () => [
         const AuthState.loading(),
-        const AuthState.failure('Incorrect password.'),
+        const AuthState.failure('unknown_error'),
       ],
     );
 
@@ -158,7 +158,7 @@ void main() {
       act: (cubit) => cubit.register(email: email, password: password),
       expect: () => [
         const AuthState.loading(),
-        const AuthState.failure('An account already exists for that email.'),
+        const AuthState.failure('unknown_error'),
       ],
     );
   });
@@ -178,15 +178,14 @@ void main() {
     );
 
     blocTest<AuthCubit, AuthState>(
-      'still emits [unauthenticated] even if logoutUseCase throws '
-      '(the user should always end up signed out locally)',
+      'emits [failure] if logoutUseCase throws',
       build: () {
         when(() => logoutUseCase())
             .thenThrow(Exception('Network error while signing out.'));
         return buildCubit();
       },
       act: (cubit) => cubit.logout(),
-      expect: () => [const AuthState.unauthenticated()],
+      expect: () => [const AuthState.failure('unknown_error')],
     );
   });
 }

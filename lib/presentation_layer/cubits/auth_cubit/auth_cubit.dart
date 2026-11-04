@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:lets_chat/core/errors/error_code_mapper.dart';
 import 'package:lets_chat/domain_layer/entities/user_entity.dart';
 import 'package:lets_chat/domain_layer/usecases/get_current_user_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/login_usecase.dart';
@@ -26,19 +27,9 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthState.loading());
 
     try {
-      // NOTE: we deliberately catch TimeoutException instead of using
-      // `.timeout(onTimeout: () => null)`. The onTimeout callback's return
-      // type must match whatever the Future was actually typed as at
-      // runtime — which can end up narrower than `UserEntity?`, causing a
-      // runtime type error. Catching the exception sidesteps that.
-      UserEntity? user;
-      try {
-        user = await getCurrentUserUseCase().timeout(
-          const Duration(seconds: 10),
-        );
-      } on TimeoutException {
-        user = null;
-      }
+      final user = await getCurrentUserUseCase().timeout(
+        const Duration(seconds: 10),
+      );
 
       if (user == null) {
         emit(const AuthState.unauthenticated());
@@ -46,8 +37,8 @@ class AuthCubit extends Cubit<AuthState> {
       }
 
       emit(AuthState.authenticated(user));
-    } catch (e) {
-      emit(AuthState.failure(_messageFromException(e)));
+    } catch (error) {
+      emit(AuthState.failure(ErrorCodeMapper.map(error)));
     }
   }
 
@@ -58,14 +49,18 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthState.loading());
 
     try {
-      final user =
-          await loginUseCase(AuthParams(email: email, password: password));
+      final user = await loginUseCase(
+        AuthParams(
+          email: email,
+          password: password,
+        ),
+      );
 
       emit(AuthState.authenticated(user));
 
       return user;
-    } catch (e) {
-      emit(AuthState.failure(_messageFromException(e)));
+    } catch (error) {
+      emit(AuthState.failure(ErrorCodeMapper.map(error)));
 
       return null;
     }
@@ -78,14 +73,18 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthState.loading());
 
     try {
-      final user =
-          await registerUseCase(AuthParams(email: email, password: password));
+      final user = await registerUseCase(
+        AuthParams(
+          email: email,
+          password: password,
+        ),
+      );
 
       emit(AuthState.authenticated(user));
 
       return user;
-    } catch (e) {
-      emit(AuthState.failure(_messageFromException(e)));
+    } catch (error) {
+      emit(AuthState.failure(ErrorCodeMapper.map(error)));
 
       return null;
     }
@@ -93,21 +92,12 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> logout() async {
     try {
-      await logoutUseCase();
-    } catch (_) {
-      // Even if the remote sign-out call fails (e.g. no internet), the
-      // user should still end up signed out locally instead of getting
-      // stuck with a silent uncaught exception.
-    } finally {
+      await logoutUseCase().timeout(
+        const Duration(seconds: 10),
+      );
       emit(const AuthState.unauthenticated());
+    } catch (error) {
+      emit(AuthState.failure(ErrorCodeMapper.map(error)));
     }
-  }
-
-  String _messageFromException(Object error) {
-    final message = error.toString();
-
-    return message.startsWith('Exception: ')
-        ? message.substring('Exception: '.length)
-        : message;
   }
 }

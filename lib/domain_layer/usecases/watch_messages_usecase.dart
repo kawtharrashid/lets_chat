@@ -9,6 +9,6 @@ class WatchMessagesUseCase implements UseCase<MessageEntityStream, int> {
 
   @override
   MessageEntityStream call(int limit) {
-    return repository.getMessages(limit: limit);
+    return repository.watchMessages(limit: limit);
   }
 }

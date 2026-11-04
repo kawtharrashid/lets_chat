@@ -1,3 +1,7 @@
+import 'package:lets_chat/core/utils/typedef.dart';
+import 'package:lets_chat/domain_layer/entities/message_cursor.dart';
+import 'package:lets_chat/domain_layer/entities/message_page.dart';
+
 import '../../domain_layer/entities/message_entity.dart';
 import '../../domain_layer/repositories/chat_repository.dart';
 import '../datasources/chat_remote_datasource.dart';
@@ -9,22 +13,29 @@ class ChatRepositoryImpl implements ChatRepository {
   ChatRepositoryImpl(this.datasource);
 
   @override
-  Stream<List<MessageEntity>> getMessages({int limit = 30}) {
-    return datasource.getMessages(limit: limit).map(
+  MessageEntityStream watchMessages({int limit = 20}) {
+    return datasource.watchMessages(limit: limit).map(
           (messages) => messages.map((message) => message.toEntity()).toList(),
         );
   }
 
   @override
-  Future<List<MessageEntity>> getMoreMessages({
-    required DateTime lastCreatedAt,
-    int limit = 30,
+  Future<MessagePage> loadMoreMessages({
+    required MessageCursor cursor,
+    int limit = 20,
   }) async {
-    final more = await datasource.getMoreMessagesByCreatedAt(
-      lastCreatedAt: lastCreatedAt,
+    final page = await datasource.loadMoreMessages(
+      cursorId: cursor.documentId,
       limit: limit,
     );
-    return more.map((message) => message.toEntity()).toList();
+    return MessagePage(
+        messages: page.messages
+            .map((message) => message.toEntity())
+            .toList(growable: false),
+        nextCursor: page.nextCursorId == null
+            ? null
+            : MessageCursor(documentId: page.nextCursorId!),
+        hasMore: page.hasMore);
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:lets_chat/core/errors/exceptions.dart';
 
 class AuthRemoteDatasource {
   final FirebaseAuth firebaseAuth;
@@ -7,8 +8,26 @@ class AuthRemoteDatasource {
 
   User? get currentUser => firebaseAuth.currentUser;
 
-  Future<void> signOut() {
-    return firebaseAuth.signOut();
+  Future<User> register({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final result = await firebaseAuth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = result.user;
+
+      if (user == null) {
+        throw const AuthenticationException('unknown_auth_error');
+      }
+
+      return user;
+    } on FirebaseAuthException catch (e) {
+      throw AuthenticationException(e.code);
+    }
   }
 
   Future<User> login({
@@ -24,68 +43,50 @@ class AuthRemoteDatasource {
       final user = result.user;
 
       if (user == null) {
-        throw Exception(
-          'Authentication failed. Please try again.',
-        );
+        throw const AuthenticationException('unknown_auth_error');
       }
 
       return user;
     } on FirebaseAuthException catch (e) {
-      throw Exception(_handleFirebaseError(e));
+      throw AuthenticationException(e.code);
     }
   }
 
-  Future<User> register({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> signOut() async {
     try {
-      final result = await firebaseAuth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      final user = result.user;
-
-      if (user == null) {
-        throw Exception(
-          'Account creation failed. Please try again.',
-        );
-      }
-
-      return user;
+      await firebaseAuth.signOut();
     } on FirebaseAuthException catch (e) {
-      throw Exception(_handleFirebaseError(e));
+      throw AuthenticationException(e.code);
     }
   }
 
-  String _handleFirebaseError(
-    FirebaseAuthException e,
-  ) {
-    switch (e.code) {
-      case 'invalid-email':
-        return 'Please enter a valid email address.';
+// String _handleFirebaseError(
+  //   FirebaseAuthException e,
+  // ) {
+  //   switch (e.code) {
+  //     case 'invalid-email':
+  //       return 'Please enter a valid email address.';
 
-      case 'user-not-found':
-        return 'No account found with this email.';
+  //     case 'user-not-found':
+  //       return 'No account found with this email.';
 
-      case 'wrong-password':
-        return 'Incorrect password.';
+  //     case 'wrong-password':
+  //       return 'Incorrect password.';
 
-      case 'invalid-credential':
-        return 'Email or password is incorrect.';
+  //     case 'invalid-credential':
+  //       return 'Email or password is incorrect.';
 
-      case 'email-already-in-use':
-        return 'This email is already registered.';
+  //     case 'email-already-in-use':
+  //       return 'This email is already registered.';
 
-      case 'weak-password':
-        return 'Password is too weak.';
+  //     case 'weak-password':
+  //       return 'Password is too weak.';
 
-      case 'network-request-failed':
-        return 'Please check your internet connection.';
+  //     case 'network-request-failed':
+  //       return 'Please check your internet connection.';
 
-      default:
-        return 'Authentication failed. Please try again.';
-    }
-  }
+  //     default:
+  //       return 'Authentication failed. Please try again.';
+  //   }
+  // }
 }

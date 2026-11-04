@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'dart:developer';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:lets_chat/core/errors/error_code_mapper.dart';
+import 'package:lets_chat/domain_layer/entities/message_cursor.dart';
 import 'package:lets_chat/domain_layer/entities/message_entity.dart';
-import 'package:lets_chat/domain_layer/usecases/load_messages_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/load_more_messages_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/params/load_more_messages_params.dart';
 import 'package:lets_chat/domain_layer/usecases/send_message_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/watch_messages_usecase.dart';
+import 'package:uuid/uuid.dart';
 
 import 'chat_state.dart';
 
@@ -15,7 +19,7 @@ class ChatCubit extends Cubit<ChatState> {
 
   StreamSubscription<List<MessageEntity>>? _messagesSubscription;
 
-  static const int _pageSize = 30;
+  static const int _pageSize = 20;
 
   ChatCubit({
     required this.watchMessagesUseCase,
@@ -26,8 +30,7 @@ class ChatCubit extends Cubit<ChatState> {
   bool get isLoadingMore => state.isLoadingMore;
 
   bool get hasReachedEnd => state.hasReachedEnd;
-
-  Future<void> getMessages() async {
+  Future<void> watchMessages() async {
     await _messagesSubscription?.cancel();
 
     emit(
@@ -37,32 +40,46 @@ class ChatCubit extends Cubit<ChatState> {
       ),
     );
 
-    _messagesSubscription = watchMessagesUseCase(
-      _pageSize,
-    ).listen(
+    _messagesSubscription = watchMessagesUseCase(_pageSize).listen(
       (messages) {
         final merged = _mergeIncomingMessages(messages);
+
+        // Initialize the pagination cursor from the oldest message
+        // in the initial Firestore result.
+        MessageCursor? initialCursor = state.nextCursor;
+
+        if (initialCursor == null && messages.isNotEmpty) {
+          final oldestMessage = messages.last;
+
+          if (oldestMessage.clientId != null &&
+              oldestMessage.clientId!.isNotEmpty &&
+              oldestMessage.createdAt != null) {
+            initialCursor = MessageCursor(
+              documentId: oldestMessage.clientId!,
+            );
+          }
+        }
 
         emit(
           state.copyWith(
             messages: merged,
             messagesStatus: ChatMessagesStatus.success,
-            isLoadingMore: false,
+            nextCursor: initialCursor,
             clearMessagesError: true,
           ),
         );
       },
-      onError: (error, stackTrace) {
+      onError: (Object error, StackTrace stackTrace) {
         log(
-          'GET MESSAGES ERROR: $error',
+          'GET MESSAGES ERROR',
+          error: error,
           stackTrace: stackTrace,
         );
 
         emit(
           state.copyWith(
             messagesStatus: ChatMessagesStatus.failure,
-            isLoadingMore: false,
-            messagesError: error.toString(),
+            messagesError: ErrorCodeMapper.map(error),
           ),
         );
       },
@@ -78,141 +95,242 @@ class ChatCubit extends Cubit<ChatState> {
   ///
   /// Instead of adding another message, we replace/reconcile
   /// the existing optimistic message.
+  /// /// Reconciles Firestore messages with the current UI list.
+  ///
+  /// Messages are matched exclusively using clientId.
   List<MessageEntity> _mergeIncomingMessages(
     List<MessageEntity> incoming,
   ) {
-    final incomingById = <String, MessageEntity>{};
-
-    final incomingByClientId = <String, MessageEntity>{};
-
-    for (final message in incoming) {
-      if (message.id != null) {
-        incomingById[message.id!] = message;
-      }
-
-      if (message.clientId != null) {
-        incomingByClientId[message.clientId!] = message;
-      }
-    }
+    final incomingByClientId = <String, MessageEntity>{
+      for (final message in incoming)
+        if (message.clientId != null) message.clientId!: message,
+    };
 
     final merged = <MessageEntity>[];
-
-    final matchedIds = <String>{};
-
     final matchedClientIds = <String>{};
 
     for (final current in state.messages) {
-      final replacement = (current.clientId != null
-              ? incomingByClientId[current.clientId!]
-              : null) ??
-          (current.id != null ? incomingById[current.id!] : null);
+      final clientId = current.clientId;
 
-      if (replacement != null) {
-        // Firestore can emit a snapshot very quickly.
-        //
-        // Therefore, if this message is still pending locally,
-        // keep isPending = true until sendMessage() itself
-        // confirms that the Firestore write has completed.
-        final reconciled = (current.isPending || current.isFailed)
-            ? replacement.copyWith(
-                createdAt: current.createdAt,
-                isPending: current.isPending,
-                isFailed: current.isFailed,
-              )
-            : replacement;
+      final replacement =
+          clientId == null ? null : incomingByClientId[clientId];
 
-        merged.add(reconciled);
-
-        if (replacement.id != null) {
-          matchedIds.add(
-            replacement.id!,
-          );
-        }
-
-        if (replacement.clientId != null) {
-          matchedClientIds.add(
-            replacement.clientId!,
-          );
-        }
-      } else {
-        // Keep messages that Firestore has not returned yet.
-        //
-        // This includes optimistic pending messages.
+      if (replacement == null) {
+        // Keep local messages that have not appeared in Firestore yet.
         merged.add(current);
+        continue;
       }
+
+      // Preserve the local sending state until the upload completes.
+      final reconciled = (current.isPending || current.isFailed)
+          ? replacement.copyWith(
+              createdAt: current.createdAt,
+              isPending: current.isPending,
+              isFailed: current.isFailed,
+            )
+          : replacement;
+
+      merged.add(reconciled);
+      matchedClientIds.add(clientId!);
     }
 
-    // Add incoming Firestore messages that were not already matched.
+    // Add Firestore messages that are not already in the local list.
     for (final message in incoming) {
-      final alreadyMatched =
-          (message.id != null && matchedIds.contains(message.id!)) ||
-              (message.clientId != null &&
-                  matchedClientIds.contains(
-                    message.clientId!,
-                  ));
+      final clientId = message.clientId;
 
-      if (!alreadyMatched) {
+      if (clientId == null || !matchedClientIds.contains(clientId)) {
         merged.add(message);
+
+        if (clientId != null) {
+          matchedClientIds.add(clientId);
+        }
       }
     }
 
     // Newest message first.
-    //
-    // MessageList uses reverse: true, so index 0 appears
-    // visually at the bottom of the screen.
-    merged.sort(
-      (a, b) {
-        final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+    merged.sort((a, b) {
+      final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
 
-        final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
 
-        return bTime.compareTo(aTime);
-      },
-    );
+      return bTime.compareTo(aTime);
+    });
 
     return merged;
   }
+  // List<MessageEntity> _mergeIncomingMessages(
+  //   List<MessageEntity> incoming,
+  // ) {
+  //   // final incomingById = <String, MessageEntity>{};
+
+  //   final incomingByClientId = <String, MessageEntity>{};
+
+  //   for (final message in incoming) {
+  //     // if (message.id != null) {
+  //     //   incomingById[message.id!] = message;
+  //     // }
+
+  //     if (message.clientId != null) {
+  //       incomingByClientId[message.clientId!] = message;
+  //     }
+  //   }
+
+  //   final merged = <MessageEntity>[];
+
+  //   final matchedIds = <String>{};
+
+  //   final matchedClientIds = <String>{};
+
+  //   for (final current in state.messages) {
+  //     final replacement = (current.clientId != null
+  //             ? incomingByClientId[current.clientId!]
+  //             : null) ??
+  //         (current.id != null ? incomingById[current.id!] : null);
+
+  //     if (replacement != null) {
+  //       // Firestore can emit a snapshot very quickly.
+  //       //
+  //       // Therefore, if this message is still pending locally,
+  //       // keep isPending = true until sendMessage() itself
+  //       // confirms that the Firestore write has completed.
+  //       final reconciled = (current.isPending || current.isFailed)
+  //           ? replacement.copyWith(
+  //               createdAt: current.createdAt,
+  //               isPending: current.isPending,
+  //               isFailed: current.isFailed,
+  //             )
+  //           : replacement;
+
+  //       merged.add(reconciled);
+
+  //       if (replacement.id != null) {
+  //         matchedIds.add(
+  //           replacement.id!,
+  //         );
+  //       }
+
+  //       if (replacement.clientId != null) {
+  //         matchedClientIds.add(
+  //           replacement.clientId!,
+  //         );
+  //       }
+  //     } else {
+  //       // Keep messages that Firestore has not returned yet.
+  //       //
+  //       // This includes optimistic pending messages.
+  //       merged.add(current);
+  //     }
+  //   }
+
+  //   // Add incoming Firestore messages that were not already matched.
+  //   for (final message in incoming) {
+  //     final alreadyMatched =
+  //         (message.id != null && matchedIds.contains(message.id!)) ||
+  //             (message.clientId != null &&
+  //                 matchedClientIds.contains(
+  //                   message.clientId!,
+  //                 ));
+
+  //     if (!alreadyMatched) {
+  //       merged.add(message);
+  //     }
+  //   }
+
+  //   // Newest message first.
+  //   //
+  //   // MessageList uses reverse: true, so index 0 appears
+  //   // visually at the bottom of the screen.
+  //   merged.sort(
+  //     (a, b) {
+  //       final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+  //       final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+  //       return bTime.compareTo(aTime);
+  //     },
+  //   );
+
+  //   return merged;
+  // }
 
   Future<void> loadMoreMessages() async {
     if (state.isLoadingMore || state.hasReachedEnd) {
       return;
     }
 
-    final confirmedMessages = state.messages
-        .where((message) => message.createdAt != null && !message.isPending)
-        .toList();
+    final cursor = state.nextCursor;
 
-    if (confirmedMessages.isEmpty) {
+    // We cannot paginate without a valid cursor.
+    if (cursor == null || cursor.documentId.isEmpty) {
       return;
     }
 
-    final last = confirmedMessages.last;
-
-    emit(state.copyWith(isLoadingMore: true));
+    emit(
+      state.copyWith(
+        isLoadingMore: true,
+        clearLoadMoreError: true,
+      ),
+    );
 
     try {
-      final more = await loadMoreMessagesUseCase(LoadMoreMessagesParams(
-          lastCreatedAt: last.createdAt!, limit: _pageSize));
+      final page = await loadMoreMessagesUseCase(
+        LoadMoreMessagesParams(
+          cursor: cursor,
+          limit: _pageSize,
+        ),
+      );
+
+      // Keep existing messages and merge the older page using clientId.
+      final mergedByClientId = <String, MessageEntity>{};
+
+      for (final message in [...state.messages, ...page.messages]) {
+        final clientId = message.clientId;
+
+        if (clientId == null || clientId.isEmpty) {
+          continue;
+        }
+
+        final existing = mergedByClientId[clientId];
+
+        if (existing == null) {
+          mergedByClientId[clientId] = message;
+        } else {
+          // Preserve the local sending/failure state if a duplicate
+          // message appears in both the current list and the new page.
+          mergedByClientId[clientId] =
+              (existing.isPending || existing.isFailed) ? existing : message;
+        }
+      }
+
+      final mergedMessages = mergedByClientId.values.toList()
+        ..sort((a, b) {
+          final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+
+          return bTime.compareTo(aTime);
+        });
 
       emit(
         state.copyWith(
-          messages: [
-            ...state.messages,
-            ...more,
-          ],
+          messages: mergedMessages,
+          nextCursor: page.nextCursor,
           isLoadingMore: false,
-          hasReachedEnd: more.isEmpty || more.length < _pageSize,
+          hasReachedEnd: !page.hasMore,
+          clearLoadMoreError: true,
+          clearNextCursor: !page.hasMore,
         ),
       );
     } catch (error, stackTrace) {
       log(
         'LOAD MORE ERROR: $error',
+        error: error,
         stackTrace: stackTrace,
       );
 
       emit(
         state.copyWith(
           isLoadingMore: false,
+          loadMoreError: ErrorCodeMapper.map(error),
         ),
       );
     }
@@ -228,9 +346,7 @@ class ChatCubit extends Cubit<ChatState> {
       return;
     }
 
-    final clientId =
-        'local_${DateTime.now().microsecondsSinceEpoch}_${state.messages.length}';
-
+    final clientId = const Uuid().v4();
     final optimisticMessage = MessageEntity(
       message: trimmedText,
       senderId: userId,
@@ -243,7 +359,6 @@ class ChatCubit extends Cubit<ChatState> {
 
       clientId: clientId,
 
-      // IMPORTANT:
       // The message starts in pending state.
       isPending: true,
     );
@@ -315,28 +430,29 @@ class ChatCubit extends Cubit<ChatState> {
     } catch (error, stackTrace) {
       log(
         'SEND MESSAGE ERROR: $error',
+        error: error,
         stackTrace: stackTrace,
       );
+      // Keep the existing logic that marks the message as failed.
+      final updatedMessages = state.messages.map((message) {
+        if (message.clientId == clientId) {
+          return message.copyWith(
+            isPending: false,
+            isFailed: true,
+          );
+        }
+
+        return message;
+      }).toList();
 
       // Upload failed.
       //
       // We keep the message in the list but mark it as failed.
       emit(
         state.copyWith(
-          messages: state.messages.map(
-            (message) {
-              if (message.clientId == clientId) {
-                return message.copyWith(
-                  isPending: false,
-                  isFailed: true,
-                );
-              }
-
-              return message;
-            },
-          ).toList(),
+          messages: updatedMessages,
           sendMessageStatus: SendMessageStatus.failure,
-          sendMessageError: error.toString(),
+          sendMessageError: ErrorCodeMapper.map(error),
         ),
       );
     }
@@ -359,12 +475,12 @@ class ChatCubit extends Cubit<ChatState> {
       isFailed: false,
     );
 
-    final updatedMessages = [...state.messages];
-    updatedMessages[messageIndex] = retryingMessage;
+    final retriedMessage = [...state.messages];
+    retriedMessage[messageIndex] = retryingMessage;
 
     emit(
       state.copyWith(
-        messages: updatedMessages,
+        messages: retriedMessage,
         sendMessageStatus: SendMessageStatus.sending,
         clearSendMessageError: true,
       ),
@@ -399,34 +515,45 @@ class ChatCubit extends Cubit<ChatState> {
 
       emit(
         state.copyWith(
-          messages: currentMessages,
-          sendMessageStatus: SendMessageStatus.idle,
-        ),
+            messages: currentMessages,
+            sendMessageStatus: SendMessageStatus.idle,
+            clearSendMessageError: true),
       );
     } catch (error, stackTrace) {
       log(
-        'RETRY MESSAGE ERROR: $error',
+        'RETRY MESSAGE ERROR',
+        error: error,
         stackTrace: stackTrace,
       );
 
-      final currentMessages = [...state.messages];
+      // final currentMessages = [...state.messages];
 
-      final currentIndex = currentMessages.indexWhere(
-        (message) => message.clientId == clientId,
-      );
+      // final currentIndex = currentMessages.indexWhere(
+      //   (message) => message.clientId == clientId,
+      // );
+      final updatedMessages = state.messages.map((message) {
+        if (message.clientId == clientId) {
+          return message.copyWith(
+            isPending: false,
+            isFailed: true,
+          );
+        }
 
-      if (currentIndex != -1) {
-        currentMessages[currentIndex] = currentMessages[currentIndex].copyWith(
-          isPending: false,
-          isFailed: true,
-        );
-      }
+        return message;
+      }).toList();
+
+      // if (currentIndex != -1) {
+      //   currentMessages[currentIndex] = currentMessages[currentIndex].copyWith(
+      //     isPending: false,
+      //     isFailed: true,
+      //   );
+      // }
 
       emit(
         state.copyWith(
-          messages: currentMessages,
+          messages: updatedMessages,
           sendMessageStatus: SendMessageStatus.failure,
-          sendMessageError: error.toString(),
+          sendMessageError: ErrorCodeMapper.map(error),
         ),
       );
     }

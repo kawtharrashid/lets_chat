@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lets_chat/core/constants.dart';
+import 'package:lets_chat/core/errors/exceptions.dart';
 
 import '../models/message_model.dart';
+import '../models/message_page_model.dart';
 
 class ChatRemoteDatasource {
   final FirebaseFirestore firestore;
@@ -11,48 +13,115 @@ class ChatRemoteDatasource {
   CollectionReference<Map<String, dynamic>> get _messages =>
       firestore.collection(kMessageCollection);
 
-  Stream<List<MessageModel>> getMessages({int limit = 30}) {
+  // Keeps Firestore document snapshots for pagination.
+  final Map<String, DocumentSnapshot<Map<String, dynamic>>> _documentCache = {};
+
+  void _cacheDocuments(
+    Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> documents,
+  ) {
+    for (final document in documents) {
+      _documentCache[document.id] = document;
+    }
+  }
+
+  Stream<List<MessageModel>> watchMessages({int limit = 20}) {
     return _messages
         .orderBy(kCreatedAt, descending: true)
         .limit(limit)
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map(MessageModel.fromFirestore)
-              .toList(growable: false),
+        .snapshots(includeMetadataChanges: true)
+        .map((snapshot) {
+      _cacheDocuments(snapshot.docs);
+
+      return snapshot.docs
+          .map(MessageModel.fromFirestore)
+          .toList(growable: false);
+    }).handleError((Object error) {
+      if (error is FirebaseException) {
+        throw FirestoreException(error.code);
+      }
+
+      throw error;
+    });
+  }
+
+  // Stream<List<MessageModel>> watchMessages({int limit = 20}) {
+  //   return _messages
+  //       .orderBy(kCreatedAt, descending: true)
+  //       .limit(limit)
+  //       .snapshots()
+  //       .map((snapshot) {
+  //     _cacheDocuments(snapshot.docs);
+
+  //     return snapshot.docs
+  //         .map(MessageModel.fromFirestore)
+  //         .toList(growable: false);
+  //   }).handleError((Object error) {
+  //     if (error is FirebaseException) {
+  //       throw FirestoreException(error.code);
+  //     }
+
+  //     throw error;
+  //   });
+  // }
+
+  Future<MessagePageModel> loadMoreMessages({
+    required String? cursorId,
+    int limit = 20,
+  }) async {
+    try {
+      if (cursorId == null || cursorId.isEmpty) {
+        throw ArgumentError.value(
+          cursorId,
+          'cursorId',
+          'A cursor ID is required to load the next page.',
         );
-  }
+      }
 
-  Future<List<MessageModel>> getMoreMessages({
-    required DocumentSnapshot<Map<String, dynamic>> lastDoc,
-    int limit = 30,
-  }) async {
-    final querySnapshot = await _messages
-        .orderBy(kCreatedAt, descending: true)
-        .startAfterDocument(lastDoc)
-        .limit(limit)
-        .get();
+      var lastDocument = _documentCache[cursorId];
 
-    return querySnapshot.docs.map(MessageModel.fromFirestore).toList();
-  }
+      // The document might not be in the cache anymore.
+      // Fetch it only as a fallback.
+      if (lastDocument == null) {
+        final document = await _messages.doc(cursorId).get();
 
-  /// Kept for compatibility with the current domain API. A timestamp cursor
-  /// can be ambiguous when multiple messages share the same timestamp.
-  Future<List<MessageModel>> getMoreMessagesByCreatedAt({
-    required DateTime lastCreatedAt,
-    int limit = 30,
-  }) async {
-    final querySnapshot = await _messages
-        .orderBy(kCreatedAt, descending: true)
-        .startAfter([Timestamp.fromDate(lastCreatedAt)])
-        .limit(limit)
-        .get();
+        if (!document.exists) {
+          throw StateError(
+            'The pagination cursor document no longer exists.',
+          );
+        }
 
-    return querySnapshot.docs.map(MessageModel.fromFirestore).toList();
+        lastDocument = document;
+        _documentCache[cursorId] = document;
+      }
+
+      final querySnapshot = await _messages
+          .orderBy(kCreatedAt, descending: true)
+          .startAfterDocument(lastDocument)
+          .limit(limit)
+          .get();
+
+      _cacheDocuments(querySnapshot.docs);
+
+      final messages = querySnapshot.docs
+          .map(MessageModel.fromFirestore)
+          .toList(growable: false);
+
+      final nextCursorId =
+          querySnapshot.docs.isEmpty ? null : querySnapshot.docs.last.id;
+
+      return MessagePageModel(
+        messages: messages,
+        nextCursorId: nextCursorId,
+        hasMore: messages.length == limit,
+      );
+    } on FirebaseException catch (error) {
+      throw FirestoreException(error.code);
+    }
   }
 
   Future<void> sendMessage(MessageModel message) async {
-    final stableId = message.clientId ?? message.id;
+    final stableId = message.clientId;
+
     if (stableId == null || stableId.isEmpty) {
       throw ArgumentError.value(
         stableId,
@@ -61,7 +130,10 @@ class ChatRemoteDatasource {
       );
     }
 
-    // Using the same document ID on retry prevents duplicate messages.
-    await _messages.doc(stableId).set(message.toJson());
+    try {
+      await _messages.doc(stableId).set(message.toJson());
+    } on FirebaseException catch (error) {
+      throw FirestoreException(error.code);
+    }
   }
 }

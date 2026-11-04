@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lets_chat/core/constants.dart';
+import 'package:lets_chat/core/errors/error_code_mapper.dart';
+import 'package:lets_chat/core/errors/error_message_mapper.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_cubit.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_state.dart';
 import 'package:lets_chat/presentation_layer/widgets/custom_button.dart';
@@ -44,8 +46,8 @@ class _RegisterState extends State<RegisterPage> {
     // error could occur if the user navigates away while awaiting.
     if (mounted &&
         context.read<AuthCubit>().state.status == AuthStatus.authenticated) {
-      _emailController.clear();
-      _passwordController.clear();
+      // _emailController.clear();
+      // _passwordController.clear();
     }
   }
 
@@ -98,9 +100,9 @@ class _RegisterState extends State<RegisterPage> {
           }
         } else if (state.status == AuthStatus.failure) {
           showSnackbar(
-            context,
-            state.errorMessage ?? 'Registration failed. Please try again.',
-          );
+              context,
+              ErrorMessageMapper.map(
+                  ErrorCodeMapper.map((state.errorCode ?? ''))));
         }
       },
       child: BlocBuilder<AuthCubit, AuthState>(

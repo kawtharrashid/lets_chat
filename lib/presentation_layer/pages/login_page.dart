@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:lets_chat/core/constants.dart';
+import 'package:lets_chat/core/errors/error_message_mapper.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_cubit.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_state.dart';
 import 'package:lets_chat/presentation_layer/widgets/custom_button.dart';
@@ -95,10 +96,7 @@ class _LoginPageState extends State<LoginPage> {
             Navigator.of(context).pop();
           }
         } else if (state.status == AuthStatus.failure) {
-          showSnackbar(
-            context,
-            state.errorMessage ?? 'Login failed. Please try again.',
-          );
+          showSnackbar(context, ErrorMessageMapper.map(state.errorCode ?? ''));
         }
       },
       child: BlocBuilder<AuthCubit, AuthState>(

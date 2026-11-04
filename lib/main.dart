@@ -10,7 +10,7 @@ import 'package:lets_chat/data_layer/repositories/auth_repository_impl.dart';
 import 'package:lets_chat/data_layer/repositories/chat_repository_impl.dart';
 import 'package:lets_chat/domain_layer/usecases/get_current_user_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/watch_messages_usecase.dart';
-import 'package:lets_chat/domain_layer/usecases/load_messages_usecase.dart';
+import 'package:lets_chat/domain_layer/usecases/load_more_messages_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/login_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/logout_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/register_usecase.dart';

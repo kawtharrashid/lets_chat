@@ -1,6 +1,6 @@
+import 'package:lets_chat/core/utils/typedef.dart';
 import 'package:lets_chat/data_layer/datasources/auth_remote_datasource.dart';
 import 'package:lets_chat/data_layer/models/user_model.dart';
-import 'package:lets_chat/domain_layer/entities/user_entity.dart';
 import 'package:lets_chat/domain_layer/repositories/auth_repository.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
@@ -9,7 +9,7 @@ class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl(this.datasource);
 
   @override
-  Future<UserEntity?> getCurrentUser() async {
+  NullableFutureUserEntity getCurrentUser() async {
     final user = datasource.currentUser;
 
     if (user == null) {
@@ -20,7 +20,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<UserEntity> login({
+  FutureUserEntity login({
     required String email,
     required String password,
   }) async {
@@ -33,7 +33,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<UserEntity> register({
+  FutureUserEntity register({
     required String email,
     required String password,
   }) async {

@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lets_chat/core/constants.dart';
+import 'package:lets_chat/core/errors/error_message_mapper.dart';
 import 'package:lets_chat/domain_layer/entities/user_entity.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_cubit.dart';
+import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_state.dart';
 import 'package:lets_chat/presentation_layer/cubits/chat_cubit/chat_cubit.dart';
 import 'package:lets_chat/presentation_layer/cubits/chat_cubit/chat_state.dart';
 import 'package:lets_chat/presentation_layer/widgets/chat_app_bar.dart';
 import 'package:lets_chat/presentation_layer/widgets/message_list.dart';
 import 'package:lets_chat/presentation_layer/widgets/message_input.dart';
+import 'package:lets_chat/presentation_layer/widgets/show_snackbar.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class ChatPage extends StatefulWidget {
@@ -109,6 +112,17 @@ class _ChatPageState extends State<ChatPage> {
 
     if (confirmed == true) {
       await authCubit.logout();
+
+      if (!mounted) return;
+
+      final state = authCubit.state;
+
+      if (state.status == AuthStatus.failure) {
+        showSnackbar(
+          context,
+          ErrorMessageMapper.map(state.errorCode ?? ''),
+        );
+      }
     }
   }
 

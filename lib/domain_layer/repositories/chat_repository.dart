@@ -1,11 +1,14 @@
+import 'package:lets_chat/core/utils/typedef.dart';
+import 'package:lets_chat/domain_layer/entities/message_cursor.dart';
 import 'package:lets_chat/domain_layer/entities/message_entity.dart';
+import 'package:lets_chat/domain_layer/entities/message_page.dart';
 
 abstract class ChatRepository {
-  Stream<List<MessageEntity>> getMessages({int limit = 30});
+  MessageEntityStream watchMessages({int limit = 20});
 
-  Future<List<MessageEntity>> getMoreMessages({
-    required DateTime lastCreatedAt,
-    int limit = 30,
+  Future<MessagePage> loadMoreMessages({
+    required MessageCursor cursor,
+    int limit = 20,
   });
 
   Future<void> sendMessage(MessageEntity message);

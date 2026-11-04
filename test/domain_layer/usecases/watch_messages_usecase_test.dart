@@ -25,23 +25,23 @@ void main() {
   ];
 
   test('forwards the page size to the repository', () {
-    when(() => repository.getMessages(limit: 30))
+    when(() => repository.watchMessages(limit: 30))
         .thenAnswer((_) => Stream.value(messages));
 
     useCase(30);
 
-    verify(() => repository.getMessages(limit: 30)).called(1);
+    verify(() => repository.watchMessages(limit: 30)).called(1);
   });
 
   test('emits the same list the repository stream emits', () {
-    when(() => repository.getMessages(limit: 30))
+    when(() => repository.watchMessages(limit: 30))
         .thenAnswer((_) => Stream.value(messages));
 
     expect(useCase(30), emits(messages));
   });
 
   test('propagates stream errors', () {
-    when(() => repository.getMessages(limit: 30)).thenAnswer(
+    when(() => repository.watchMessages(limit: 30)).thenAnswer(
       (_) => Stream.error(Exception('Firestore offline')),
     );
 

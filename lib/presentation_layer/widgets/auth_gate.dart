@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lets_chat/core/constants.dart';
-import 'package:lets_chat/domain_layer/usecases/load_messages_usecase.dart';
+import 'package:lets_chat/core/errors/error_message_mapper.dart';
+import 'package:lets_chat/domain_layer/usecases/load_more_messages_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/send_message_usecase.dart';
 import 'package:lets_chat/domain_layer/usecases/watch_messages_usecase.dart';
 import 'package:lets_chat/presentation_layer/cubits/auth_cubit/auth_cubit.dart';
@@ -35,45 +36,39 @@ class _AuthGateState extends State<AuthGate> {
     return BlocListener<AuthCubit, AuthState>(
       listenWhen: (previous, current) =>
           current.status == AuthStatus.failure &&
-          current.errorMessage != null &&
-          previous.errorMessage != current.errorMessage,
+          current.errorCode != null &&
+          previous.errorCode != current.errorCode,
       listener: (context, state) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(state.errorMessage!),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-          ),
-        );
+        final errorCode = state.errorCode;
+
+        if (errorCode == null) return;
+
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(ErrorMessageMapper.map(errorCode)),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(16),
+            ),
+          );
       },
       child: BlocBuilder<AuthCubit, AuthState>(
         builder: (context, state) {
           switch (state.status) {
             case AuthStatus.initial:
-              if (_currentPage == null) {
-                return Scaffold(
-                  body: Center(
-                    child: LoadingAnimationWidget.hexagonDots(
-                      color: kPrimaryColor,
-                      size: 50,
-                    ),
-                  ),
-                );
+              if (_currentPage != null) {
+                return _currentPage!;
               }
-              return _currentPage!;
+
+              return _loadingScreen();
+
             case AuthStatus.loading:
               if (_currentPage != null) {
                 return _currentPage!;
               }
 
-              return Scaffold(
-                body: Center(
-                  child: LoadingAnimationWidget.hexagonDots(
-                    color: kPrimaryColor,
-                    size: 50,
-                  ),
-                ),
-              );
+              return _loadingScreen();
 
             case AuthStatus.authenticated:
               final user = state.user;
@@ -88,18 +83,34 @@ class _AuthGateState extends State<AuthGate> {
                   watchMessagesUseCase: widget.watchMessagesUseCase,
                   sendMessageUseCase: widget.sendMessageUseCase,
                   loadMoreMessagesUseCase: widget.loadMoreMessagesUseCase,
-                )..getMessages(),
+                )..watchMessages(),
                 child: ChatPage(user: user),
               );
 
               return _currentPage!;
 
             case AuthStatus.unauthenticated:
-            case AuthStatus.failure:
               _currentPage = const LoginPage();
               return _currentPage!;
+
+            case AuthStatus.failure:
+              // Keep the current page on failure.
+              // A failed logout must not automatically send the user
+              // to the login page.
+              return _currentPage ?? const LoginPage();
           }
         },
+      ),
+    );
+  }
+
+  Widget _loadingScreen() {
+    return Scaffold(
+      body: Center(
+        child: LoadingAnimationWidget.hexagonDots(
+          color: kPrimaryColor,
+          size: 50,
+        ),
       ),
     );
   }
